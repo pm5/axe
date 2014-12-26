@@ -1,11 +1,13 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
-	"github.com/PuerkitoBio/goquery"
+	//"fmt"
+	"io/ioutil"
 	"log"
-	"os"
+	"net/http"
+	//"os"
+	re "regexp"
 	"strconv"
 )
 
@@ -14,30 +16,58 @@ type Grade struct {
 	Grades map[string]int `json:"grades"`
 }
 
-func main() {
-	doc, err := goquery.NewDocument("http://axe-level-1.herokuapp.com/")
+func GetHTMLBody(url string) (output []byte, err error) {
+	resp, err := http.Get(url)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
+	defer resp.Body.Close()
 
-	fields := []string{"國語", "數學", "自然", "社會", "健康教育"}
-	lines := doc.Find("tr")
-	output := make([]Grade, 0, lines.Length())
-	lines.Slice(1, lines.Length()).Each(func(i int, s *goquery.Selection) {
-		g := Grade{Name: "", Grades: map[string]int{}}
-		g.Name = s.Find("td").First().Text()
-		s.Find("td").Slice(1, 6).Each(func(i int, t *goquery.Selection) {
-			g.Grades[fields[i]], err = strconv.Atoi(t.Text())
-		})
+	return ioutil.ReadAll(resp.Body)
+}
+
+func GetData(b []byte) (output []Grade, err error) {
+	rowRE, err := re.Compile("(?sU)<tr>(.*)</tr>")
+	colRE, err := re.Compile("(?sU)<td>(.*)</td>")
+	colNames := []string{"姓名", "國語", "數學", "自然", "社會", "健康教育"}
+	for index, row := range rowRE.FindAllSubmatch(b, -1) {
+		if index == 0 {
+			continue
+		}
+		g := Grade{Name: "", Grades: make(map[string]int, len(colNames)-1)}
+		for index, col := range colRE.FindAllSubmatch(row[1], -1) {
+			if index == 0 {
+				g.Name = string(col[1])
+			} else {
+				g.Grades[colNames[index]], err = strconv.Atoi(string(col[1]))
+			}
+		}
 		output = append(output, g)
-	})
+	}
+	return
+}
 
-	b, err := json.Marshal(output)
+func main() {
+	b, err := GetHTMLBody("http://axe-level-1.herokuapp.com/")
+	if err != nil {
+		log.Fatal(err)
+	}
+	//os.Stdout.Write(b)
+
+	d, err := GetData(b)
+	if err != nil {
+		log.Fatal(err)
+	}
+	//fmt.Println(o)
+
+	j, err := json.Marshal(d)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	var out bytes.Buffer
-	json.Indent(&out, b, "", "  ")
-	out.WriteTo(os.Stdout)
+	err = ioutil.WriteFile("output.json", j, 0600)
+	if err != nil {
+		log.Fatal(err)
+	}
+	//os.Stdout.Write(j)
 }
