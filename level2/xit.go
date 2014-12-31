@@ -37,18 +37,18 @@ func GetData(b []byte) (output []Chief, err error) {
 	return
 }
 
-func GetSinglePage(p int) (output []Chief, err error) {
-	b, err := GetHTMLBody(fmt.Sprintf("http://axe-level-1.herokuapp.com/lv2/?page=%d", p))
+func GetSinglePageData(url string) (output []Chief, err error) {
+	b, err := GetHTMLBody(url)
 	if err != nil {
 		log.Fatal(err)
 	}
 	return GetData(b)
 }
 
-func GetAllData() (output []Chief, err error) {
+func GetAllData(url string) (output []Chief, err error) {
 	var d []Chief
 	for p := 1; p <= 12; p++ {
-		d, err = GetSinglePage(p)
+		d, err = GetSinglePageData(fmt.Sprintf("http://axe-level-1.herokuapp.com/lv2/?page=%d", p))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -58,7 +58,7 @@ func GetAllData() (output []Chief, err error) {
 }
 
 func main() {
-	d, err := GetAllData()
+	d, err := GetAllData("http://axe-level-1.herokuapp.com/lv2/")
 	if err != nil {
 		log.Fatal(err)
 	}
